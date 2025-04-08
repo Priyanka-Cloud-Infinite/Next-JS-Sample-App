@@ -6,9 +6,9 @@ pipeline {
         AWS_REGION = 'us-east-1'
         SONAR_HOST_URL = 'http://13.219.61.104:9000'
         SONAR_TOKEN = credentials('sonarqube-token') 
-        // MONGODB_URI_DEV = credentials('mongodb-uri-dev')
         APP_NAME = 'nextjs-app'
         APP_VERSION = "${env.BUILD_NUMBER}"
+        DOCKER_BUILDKIT = '1'  // Enable BuildKit
     }
 
     stages {
@@ -59,10 +59,10 @@ DOCKERFILE_EOF
                     fi
                     '''
 
-                    // Build Docker image with error handling
+                    // Build Docker image with error handling and BuildKit enabled
                     sh '''#!/bin/bash
                     set +e
-                    docker build -t "${APP_NAME}:${APP_VERSION}" .
+                    DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" .
                     if [ $? -ne 0 ]; then
                         echo "Docker build failed, creating minimal image for pipeline to continue"
                         cat > Dockerfile.minimal << 'EOF'
@@ -70,7 +70,7 @@ FROM node:18-alpine
 WORKDIR /app
 CMD ["echo", "Placeholder image"]
 EOF
-                        docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
+                        DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
                     fi
                     '''
                 }
