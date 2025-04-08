@@ -88,35 +88,38 @@ EOF
                 }
             }
         }
-
         stage('Push to ECR') {
-            steps {
-                script {
-                    // Login to ECR with error handling
-                    sh '''#!/bin/bash
-                    set +e
-                    aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REPOSITORY}" || {
-                        echo "ECR login failed, but continuing pipeline"
-                        exit 0
-                    }
-                    '''
-
-                    // Tag and push image with error handling
-                    sh '''#!/bin/bash
-                    set +e
-                    docker tag "${APP_NAME}:${APP_VERSION}" "${ECR_REPOSITORY}:${APP_VERSION}" && \
-                    docker tag "${APP_NAME}:${APP_VERSION}" "${ECR_REPOSITORY}:latest" && \
-                    docker push "${ECR_REPOSITORY}:${APP_VERSION}" && \
-                    docker push "${ECR_REPOSITORY}:latest" || {
-                        echo "Docker push failed, but continuing pipeline"
-                        exit 0
-                    }
-                    '''
+    steps {
+        withAWS(credentials: 'aws-key', region: "${AWS_REGION}") {
+            script {
+                // Login to ECR
+                sh '''#!/bin/bash
+                set +e
+                aws ecr get-login-password --region "${AWS_REGION}" | docker login --username AWS --password-stdin "${ECR_REPOSITORY}" || {
+                    echo "ECR login failed, but continuing pipeline"
+                    exit 0
                 }
+                '''
+                
+                // Tag and push image
+                sh '''#!/bin/bash
+                set +e
+                docker tag "${APP_NAME}:${APP_VERSION}" "${ECR_REPOSITORY}:${APP_VERSION}" && \
+                docker tag "${APP_NAME}:${APP_VERSION}" "${ECR_REPOSITORY}:latest" && \
+                docker push "${ECR_REPOSITORY}:${APP_VERSION}" && \
+                docker push "${ECR_REPOSITORY}:latest" || {
+                    echo "Docker push failed, but continuing pipeline"
+                    exit 0
+                }
+                '''
             }
         }
+    }
+}
 
-        stage('Deploy to Dev') {
+
+    
+         stage('Deploy to Dev') {
             steps {
                 script {
                     try {
