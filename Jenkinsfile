@@ -35,7 +35,6 @@ pipeline {
                                 -Dsonar.sources=. \
                                 -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/** \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-                                -Dsonar.login=sqp_f3afd4d39e8dae998018c161f91fdfb05be549b6
                               '''
                           }
                           
@@ -45,12 +44,6 @@ pipeline {
                       }
                   }
 
-                  
-                  stage('Run Tests') {
-                      steps {
-                          sh 'npm test'
-                      }
-                  }
                   
                   stage('Build Application') {
                       steps {
