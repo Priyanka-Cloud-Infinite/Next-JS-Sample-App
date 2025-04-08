@@ -70,7 +70,7 @@ FROM node:18-alpine
 WORKDIR /app
 CMD ["echo", "Placeholder image"]
 EOF
-                        DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
+                        DOCKER_BUILDKIT=1 sudo docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
                     fi
                     '''
                 }
