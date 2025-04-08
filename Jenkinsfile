@@ -4,9 +4,9 @@ pipeline {
               environment {
                   ECR_REPOSITORY = credentials('ecr-repository-url')
                   AWS_REGION = 'us-east-1'
-                  SONAR_HOST_URL = 'http://sonarqube:9000'
+                  SONAR_HOST_URL = 'http://13.219.61.104:9000'
                   SONAR_TOKEN = credentials('sonarqube-token') 
-                  MONGODB_URI_DEV = credentials('mongodb-uri-dev')
+                  // MONGODB_URI_DEV = credentials('mongodb-uri-dev')
                   APP_NAME = 'nextjs-app'
                   APP_VERSION = "${env.BUILD_NUMBER}"
               }
