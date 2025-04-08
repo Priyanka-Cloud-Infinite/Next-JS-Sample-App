@@ -24,16 +24,18 @@ pipeline {
                       }
                   }
                   
-                  stage('Code Quality Analysis') {
+                    stage('Code Quality Analysis') {
                       steps {
                           withSonarQubeEnv('SonarQube') {
                               sh '''
-                              sonar-scanner \\
-                                -Dsonar.projectKey=${APP_NAME} \\
-                                -Dsonar.projectName=${APP_NAME} \\
-                                -Dsonar.sources=. \\
-                                -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js \\
+                              export PATH=$PATH:$HOME/.local/bin
+                              sonar-scanner \
+                                -Dsonar.projectKey=${APP_NAME} \
+                                -Dsonar.projectName=${APP_NAME} \
+                                -Dsonar.sources=. \
+                                -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/** \
                                 -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+                                -Dsonar.login=sqp_f3afd4d39e8dae998018c161f91fdfb05be549b6
                               '''
                           }
                           
@@ -42,6 +44,7 @@ pipeline {
                           }
                       }
                   }
+
                   
                   stage('Run Tests') {
                       steps {
