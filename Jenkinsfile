@@ -1,5 +1,5 @@
 pipeline {
-              agent any
+              agent { label 'build-agent' }
               
               environment {
                   ECR_REPOSITORY = credentials('ecr-repository-url')
