@@ -170,7 +170,6 @@ echo "Deployment completed successfully!"
             }
         }
     }
-}
     post {
         always {
             // Clean up Docker images with error handling
