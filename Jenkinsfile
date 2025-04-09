@@ -12,12 +12,18 @@ pipeline {
     }
 
     stages {
-        stage('Deploy to EC2') {
-            steps {
-                withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY')]) {
-                    script {
-                        // Create a deployment script without interpolating secrets
-                        writeFile file: 'deploy.sh', text: '''#!/bin/bash
+ stage('Deploy to EC2') {
+    steps {
+        withCredentials([
+            string(credentialsId: 'ecr-repository-url', variable: 'ECR_REPOSITORY_URL'),
+            string(credentialsId: 'ec2-host-ip', variable: 'EC2_HOST_IP'),
+            sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY'),
+            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-key', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']
+        ]) {
+            sh '''
+            # Create deployment script
+            cat > deploy.sh << 'EOF'
+#!/bin/bash
 set -e
 
 # Login to ECR
@@ -40,39 +46,36 @@ docker run -d \\
   $ECR_REPOSITORY:latest
 
 echo "Deployment completed successfully!"
-'''
+EOF
 
-                        // Make the script executable
-                        sh 'chmod +x deploy.sh'
-                        
-                        // Copy the script to the EC2 instance
-                        sh "scp -i ${SSH_KEY} -o StrictHostKeyChecking=no deploy.sh ${SSH_USER}@${EC2_HOST}:/tmp/"
-                        
-                        // Extract ECR registry for secure passing
-                        def ecrRegistry = sh(script: "echo ${ECR_REPOSITORY} | cut -d'/' -f1", returnStdout: true).trim()
-                        
-                        // Execute the script on the EC2 instance with AWS credentials
-                        withAWS(credentials: 'aws-key', region: "${AWS_REGION}") {
-                            sh """
-                            ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${SSH_USER}@${EC2_HOST} '
-                            export AWS_ACCESS_KEY_ID=\$(aws configure get aws_access_key_id)
-                            export AWS_SECRET_ACCESS_KEY=\$(aws configure get aws_secret_access_key)
-                            export AWS_DEFAULT_REGION=${AWS_REGION}
-                            export ECR_REGISTRY=${ecrRegistry}
-                            export ECR_REPOSITORY=${ECR_REPOSITORY}
-                            export CONTAINER_NAME=${CONTAINER_NAME}
-                            export APP_PORT=${APP_PORT}
-                            sudo -E bash /tmp/deploy.sh
-                            '
-                            """
-                        }
-                        
-                        // Clean up the script on the EC2 instance
-                        sh "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${SSH_USER}@${EC2_HOST} 'rm /tmp/deploy.sh'"
-                    }
-                }
-            }
+            # Make script executable
+            chmod +x deploy.sh
+            
+            # Extract ECR registry
+            ECR_REGISTRY=$(echo $ECR_REPOSITORY_URL | cut -d'/' -f1)
+            
+            # Copy script to EC2
+            scp -i $SSH_KEY -o StrictHostKeyChecking=no deploy.sh ubuntu@$EC2_HOST_IP:/tmp/
+            
+            # Execute script on EC2
+            ssh -i $SSH_KEY -o StrictHostKeyChecking=no ubuntu@$EC2_HOST_IP "
+                export AWS_ACCESS_KEY_ID='$AWS_ACCESS_KEY_ID'
+                export AWS_SECRET_ACCESS_KEY='$AWS_SECRET_ACCESS_KEY'
+                export AWS_DEFAULT_REGION='$AWS_REGION'
+                export ECR_REGISTRY='$ECR_REGISTRY'
+                export ECR_REPOSITORY='$ECR_REPOSITORY_URL'
+                export CONTAINER_NAME='nextjs-app'
+                export APP_PORT='3000'
+                sudo -E bash /tmp/deploy.sh
+            "
+            
+            # Clean up
+            ssh -i $SSH_KEY -o StrictHostKeyChecking=no ubuntu@$EC2_HOST_IP 'rm /tmp/deploy.sh'
+            rm -f deploy.sh
+            '''
         }
+    }
+}
     }
 
     post {
