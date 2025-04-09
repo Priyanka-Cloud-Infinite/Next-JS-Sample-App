@@ -116,35 +116,61 @@ EOF
         }
     }
 }
+        
+stage('Deploy to EC2') {
+    steps {
+        withCredentials([sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY')]) {
+            script {
+                // Create a deployment script
+                writeFile file: 'deploy.sh', text: """#!/bin/bash
+set -e
 
+# Login to ECR
+aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY.split('/')[0]}
 
-    
-         stage('Deploy to Dev') {
-            steps {
-                script {
-                    try {
-                        // Deploy to Dev environment using Ansible
-                        ansiblePlaybook(
-                            playbook: 'ansible/nextjs-docker-deploy.yml',
-                            inventory: 'ansible/inventories/dev.ini',
-                            extraVars: [
-                                ecr_repository_url: "${ECR_REPOSITORY}",
-                                aws_region: "${AWS_REGION}",
-                                mongodb_uri: "${MONGODB_URI_DEV}",
-                                app_env: 'dev'
-                            ],
-                            colorized: true,
-                            installation: 'ansible',
-                            extras: '-v'
-                        )
-                    } catch (Exception e) {
-                        echo "Deployment failed but continuing pipeline: ${e.message}"
-                    }
+# Pull the latest image
+docker pull ${ECR_REPOSITORY}:latest
+
+# Stop and remove existing container
+docker stop ${CONTAINER_NAME} || true
+docker rm ${CONTAINER_NAME} || true
+
+# Run the new container
+docker run -d \\
+  --name ${CONTAINER_NAME} \\
+  --restart always \\
+  -p ${APP_PORT}:3000 \\
+  -e NODE_ENV=dev \\
+  -v /opt/nextjs-app/logs:/app/logs \\
+  ${ECR_REPOSITORY}:latest
+
+echo "Deployment completed successfully!"
+"""
+
+                // Make the script executable
+                sh 'chmod +x deploy.sh'
+                
+                // Copy the script to the EC2 instance
+                sh "scp -i ${SSH_KEY} -o StrictHostKeyChecking=no deploy.sh ${SSH_USER}@${EC2_HOST}:/tmp/"
+                
+                // Execute the script on the EC2 instance with AWS credentials
+                withAWS(credentials: 'aws-key', region: "${AWS_REGION}") {
+                    sh """
+                    ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${SSH_USER}@${EC2_HOST} '
+                    export AWS_ACCESS_KEY_ID=\$(aws configure get aws_access_key_id)
+                    export AWS_SECRET_ACCESS_KEY=\$(aws configure get aws_secret_access_key)
+                    export AWS_DEFAULT_REGION=${AWS_REGION}
+                    sudo -E bash /tmp/deploy.sh
+                    '
+                    """
                 }
+                
+                // Clean up the script on the EC2 instance
+                sh "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${SSH_USER}@${EC2_HOST} 'rm /tmp/deploy.sh'"
             }
         }
     }
-
+}
     post {
         always {
             // Clean up Docker images with error handling
