@@ -17,6 +17,7 @@ stage('Deploy to EC2') {
         AWS_REGION = 'us-east-1' 
         CONTAINER_NAME = 'nextjs-app'
         APP_PORT = '3000'
+        EC2_HOST_IP = '44.208.194.85'
     }
     steps {
         withCredentials([
