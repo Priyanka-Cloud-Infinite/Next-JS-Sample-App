@@ -23,7 +23,7 @@ stage('Deploy to EC2') {
             string(credentialsId: 'ecr-repository-url', variable: 'ECR_REPOSITORY_URL'), // e.g. 123456789012.dkr.ecr.us-east-1.amazonaws.com/my-app
             string(credentialsId: 'ec2-host-ip', variable: 'EC2_HOST_IP'),
             sshUserPrivateKey(credentialsId: 'ec2-ssh-key', keyFileVariable: 'SSH_KEY'),
-            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-key', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']
+            [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'ad8fe7e7-273b-40f0-a851-5fdaaa639e57', accessKeyVariable: 'AWS_ACCESS_KEY_ID', secretKeyVariable: 'AWS_SECRET_ACCESS_KEY']
         ]) {
             sh '''
                 # Extract ECR registry domain from the full repo URL
