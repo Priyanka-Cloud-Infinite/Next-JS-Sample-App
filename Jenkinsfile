@@ -13,9 +13,8 @@ pipeline {
         ECS_SERVICE_DEV = 'dev-nextjs-servic'
     }
 
-    
     stages {
-               stage('Checkout') {
+        stage('Checkout') {
             steps {
                 checkout scm
             }
@@ -91,39 +90,41 @@ EOF
                 }
             }
         }
-stage('Push to ECR') {
-    steps {
-        withAWS(credentials: 'aws-key', region: "${AWS_REGION}") {
-            script {
-                def ecrRegistry = sh(script: "echo ${ECR_REPOSITORY} | cut -d'/' -f1", returnStdout: true).trim()
-                
-                sh 'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ' + ecrRegistry
-                sh 'docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:${APP_VERSION}'
-                sh 'docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:latest'
-                sh 'docker push ${ECR_REPOSITORY}:${APP_VERSION}'
-                sh 'docker push ${ECR_REPOSITORY}:latest'
+
+        stage('Push to ECR') {
+            steps {
+                withAWS(credentials: 'aws-key', region: "${AWS_REGION}") {
+                    script {
+                        def ecrRegistry = sh(script: "echo ${ECR_REPOSITORY} | cut -d'/' -f1", returnStdout: true).trim()
+                        
+                        sh 'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ' + ecrRegistry
+                        sh 'docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:${APP_VERSION}'
+                        sh 'docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:latest'
+                        sh 'docker push ${ECR_REPOSITORY}:${APP_VERSION}'
+                        sh 'docker push ${ECR_REPOSITORY}:latest'
+                    }
+                }
             }
         }
-    }
-}
 
-stage('Deploy to Dev ECS') {
-  steps {
-    script {
-      // Get AWS credentials for Dev OU
-      withAWS(credentials: 'aws-dev-credentials', region: '${AWS_REGION}') {
-        sh '''
-          # Update ECS service to force new deployment with the image from Ops ECR
-          aws ecs update-service --cluster ${ECS_CLUSTER_DEV} --service ${ECS_SERVICE_DEV} --force-new-deployment --region ${AWS_REGION}
-          
-          # Wait for service to stabilize
-          aws ecs wait services-stable --cluster ${ECS_CLUSTER_DEV} --services ${ECS_SERVICE_DEV} --region ${AWS_REGION}
-          
-          echo "Deployment to Dev ECS completed successfully!"
-        '''
-      }
-    }
-  }
+        stage('Deploy to Dev ECS') {
+            steps {
+                script {
+                    // Get AWS credentials for Dev OU
+                    withAWS(credentials: 'aws-dev-credentials', region: "${AWS_REGION}") {
+                        sh '''
+                        # Update ECS service to force new deployment with the image from Ops ECR
+                        aws ecs update-service --cluster ${ECS_CLUSTER_DEV} --service ${ECS_SERVICE_DEV} --force-new-deployment --region ${AWS_REGION}
+                        
+                        # Wait for service to stabilize
+                        aws ecs wait services-stable --cluster ${ECS_CLUSTER_DEV} --services ${ECS_SERVICE_DEV} --region ${AWS_REGION}
+                        
+                        echo "Deployment to Dev ECS completed successfully!"
+                        '''
+                    }
+                }
+            }
+        }
     }
 
     post {
@@ -133,12 +134,8 @@ stage('Deploy to Dev ECS') {
             docker rmi ${APP_NAME}:${APP_VERSION} || true
             docker rmi ${ECR_REPOSITORY}:${APP_VERSION} || true
             docker rmi ${ECR_REPOSITORY}:latest || true
-            """
-            
-            // Clean up deployment script
-            sh 'rm -f deploy.sh'
         }
-        
+
         success {
             echo "Deployment completed successfully! The application is now running on ${EC2_HOST}:${APP_PORT}"
         }
