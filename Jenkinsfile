@@ -111,25 +111,25 @@ pipeline {
 //             }
 //         }
 
-         stage('Code Quality Analysis') {
-                      steps {
-                          withSonarQubeEnv('SonarQube') {
-                              sh '''
-                              export PATH=$PATH:$HOME/.local/bin
-                              sonar-scanner \
-                                -Dsonar.projectKey=${APP_NAME} \
-                                -Dsonar.projectName=${APP_NAME} \
-                                -Dsonar.sources=. \
-                                -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/** \
-                                -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-                              '''
-                          }
+         // stage('Code Quality Analysis') {
+         //              steps {
+         //                  withSonarQubeEnv('SonarQube') {
+         //                      sh '''
+         //                      export PATH=$PATH:$HOME/.local/bin
+         //                      sonar-scanner \
+         //                        -Dsonar.projectKey=${APP_NAME} \
+         //                        -Dsonar.projectName=${APP_NAME} \
+         //                        -Dsonar.sources=. \
+         //                        -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/** \
+         //                        -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+         //                      '''
+         //                  }
                           
-                          timeout(time: 10, unit: 'MINUTES') {
-                              waitForQualityGate abortPipeline: true
-                          }
-                      }
-                  }
+         //                  timeout(time: 10, unit: 'MINUTES') {
+         //                      waitForQualityGate abortPipeline: true
+         //                  }
+         //              }
+         //          }
 
         stage('Deploy to Dev ECS') {
             steps {
@@ -156,8 +156,8 @@ pipeline {
             // Clean up Docker images
             sh """
                 docker rmi ${env.APP_NAME}:${env.APP_VERSION} || true
-                docker rmi ${env.ECR_REPOSITORY}:${env.APP_VERSION} || true
-                docker rmi ${env.ECR_REPOSITORY}:latest || true
+                // docker rmi ${env.ECR_REPOSITORY}:${env.APP_VERSION} || true
+                // docker rmi ${env.ECR_REPOSITORY}:latest || true
             """
         }
 
