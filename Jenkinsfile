@@ -167,27 +167,26 @@ echo "Deployment completed successfully!"
                 
                 // Clean up the script on the EC2 instance
                 sh "ssh -i ${SSH_KEY} -o StrictHostKeyChecking=no ${SSH_USER}@${EC2_HOST} 'rm /tmp/deploy.sh'"
+                }
             }
         }
     }
+}
     post {
         always {
-            // Clean up Docker images with error handling
-            sh '''#!/bin/bash
-            set +e
-            docker rmi "${APP_NAME}:${APP_VERSION}" || true
-            docker rmi "${ECR_REPOSITORY}:${APP_VERSION}" || true
-            docker rmi "${ECR_REPOSITORY}:latest" || true
-            '''
-
-            // Archive artifacts with error handling
-            script {
-                try {
-                    archiveArtifacts artifacts: '.next/**', fingerprint: true, allowEmptyArchive: true
-                } catch (Exception e) {
-                    echo "Failed to archive artifacts: ${e.message}"
-                }
-            }
+            // Clean up Docker images
+            sh """
+            docker rmi ${APP_NAME}:${APP_VERSION} || true
+            docker rmi ${ECR_REPOSITORY}:${APP_VERSION} || true
+            docker rmi ${ECR_REPOSITORY}:latest || true
+            """
+            
+            // Clean up deployment script
+            sh 'rm -f deploy.sh'
+        }
+        
+        success {
+            echo "Deployment completed successfully! The application is now running on ${EC2_HOST}:${APP_PORT}"
         }
     }
 }
