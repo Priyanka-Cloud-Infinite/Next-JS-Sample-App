@@ -10,7 +10,9 @@ pipeline {
         APP_VERSION = "${env.BUILD_NUMBER}"
         DOCKER_BUILDKIT = '1'  // Enable BuildKit
         ECS_CLUSTER_DEV = 'dev-cluster'
-        ECS_SERVICE_DEV = 'dev-nextjs-servic'
+        ECS_SERVICE_DEV = 'dev-nextjs-service'
+        EC2_HOST = '' 
+        APP_PORT = '3000' 
     }
 
     stages {
@@ -72,7 +74,7 @@ FROM node:18-alpine
 WORKDIR /app
 CMD ["echo", "Placeholder image"]
 EOF
-                        DOCKER_BUILDKIT=1 sudo docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
+                        DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
                     fi
                     '''
                 }
@@ -93,15 +95,17 @@ EOF
 
         stage('Push to ECR') {
             steps {
-                withAWS(credentials: 'aws-key', region: "${AWS_REGION}") {
+                withAWS(credentials: 'aws-key', region: "${env.AWS_REGION}") {
                     script {
-                        def ecrRegistry = sh(script: "echo ${ECR_REPOSITORY} | cut -d'/' -f1", returnStdout: true).trim()
+                        def ecrRegistry = sh(script: "echo ${env.ECR_REPOSITORY} | cut -d'/' -f1", returnStdout: true).trim()
                         
-                        sh 'aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ' + ecrRegistry
-                        sh 'docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:${APP_VERSION}'
-                        sh 'docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:latest'
-                        sh 'docker push ${ECR_REPOSITORY}:${APP_VERSION}'
-                        sh 'docker push ${ECR_REPOSITORY}:latest'
+                        sh '''
+                            aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ''' + ecrRegistry + '''
+                            docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:${APP_VERSION}
+                            docker tag ${APP_NAME}:${APP_VERSION} ${ECR_REPOSITORY}:latest
+                            docker push ${ECR_REPOSITORY}:${APP_VERSION}
+                            docker push ${ECR_REPOSITORY}:latest
+                        '''
                     }
                 }
             }
@@ -111,15 +115,15 @@ EOF
             steps {
                 script {
                     // Get AWS credentials for Dev OU
-                    withAWS(credentials: 'aws-dev-credentials', region: "${AWS_REGION}") {
+                    withAWS(credentials: 'aws-dev-credentials', region: "${env.AWS_REGION}") {
                         sh '''
-                        # Update ECS service to force new deployment with the image from Ops ECR
-                        aws ecs update-service --cluster ${ECS_CLUSTER_DEV} --service ${ECS_SERVICE_DEV} --force-new-deployment --region ${AWS_REGION}
-                        
-                        # Wait for service to stabilize
-                        aws ecs wait services-stable --cluster ${ECS_CLUSTER_DEV} --services ${ECS_SERVICE_DEV} --region ${AWS_REGION}
-                        
-                        echo "Deployment to Dev ECS completed successfully!"
+                            # Update ECS service to force new deployment
+                            aws ecs update-service --cluster ${ECS_CLUSTER_DEV} --service ${ECS_SERVICE_DEV} --force-new-deployment --region ${AWS_REGION}
+                            
+                            # Wait for service to stabilize
+                            aws ecs wait services-stable --cluster ${ECS_CLUSTER_DEV} --services ${ECS_SERVICE_DEV} --region ${AWS_REGION}
+                            
+                            echo "Deployment to Dev ECS completed successfully!"
                         '''
                     }
                 }
@@ -131,13 +135,14 @@ EOF
         always {
             // Clean up Docker images
             sh """
-            docker rmi ${APP_NAME}:${APP_VERSION} || true
-            docker rmi ${ECR_REPOSITORY}:${APP_VERSION} || true
-            docker rmi ${ECR_REPOSITORY}:latest || true
+                docker rmi ${env.APP_NAME}:${env.APP_VERSION} || true
+                docker rmi ${env.ECR_REPOSITORY}:${env.APP_VERSION} || true
+                docker rmi ${env.ECR_REPOSITORY}:latest || true
+            """
         }
 
         success {
-            echo "Deployment completed successfully! The application is now running on ${EC2_HOST}:${APP_PORT}"
+            echo "Deployment completed successfully! The application is now running on ${env.EC2_HOST}:${env.APP_PORT}"
         }
     }
 }
