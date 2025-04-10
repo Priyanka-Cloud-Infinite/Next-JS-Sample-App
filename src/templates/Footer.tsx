@@ -67,7 +67,7 @@ const Footer = () => (
         </li>
         <li>
           <Link href="https://github.com/ixartz/Next-JS-Landing-Page-Starter-Template">
-            GitHub
+            EZD Test Deployment
           </Link>
         </li>
       </CenteredFooter>
