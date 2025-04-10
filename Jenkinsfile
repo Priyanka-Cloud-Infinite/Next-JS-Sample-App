@@ -8,11 +8,11 @@ pipeline {
         SONAR_TOKEN = credentials('sonarqube-token') 
         APP_NAME = 'nextjs-app'
         APP_VERSION = "${env.BUILD_NUMBER}"
-        DOCKER_BUILDKIT = '1'  // Enable BuildKit
+        DOCKER_BUILDKIT = '1'
         ECS_CLUSTER_DEV = 'dev-cluster'
         ECS_SERVICE_DEV = 'dev-nextjs-service'
-        EC2_HOST = '' 
-        APP_PORT = '3000' 
+        EC2_HOST = ''
+        APP_PORT = '3000'
     }
 
     stages {
@@ -37,15 +37,15 @@ pipeline {
         stage('Code Quality Analysis') {
             steps {
                 withSonarQubeEnv('SonarQube') {
-                    sh '''
-                        export PATH=$PATH:$HOME/.local/bin
+                    sh """
+                        export PATH=\$PATH:\$HOME/.local/bin
                         sonar-scanner \
-                          -Dsonar.projectKey=nextjs-app \
-                          -Dsonar.projectName=nextjs-app \
+                          -Dsonar.projectKey=${APP_NAME} \
+                          -Dsonar.projectName=${APP_NAME} \
                           -Dsonar.sources=. \
                           -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/**,Jenkinsfile* \
                           -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
-                    '''
+                    """
                 }
 
                 timeout(time: 10, unit: 'MINUTES') {
@@ -57,11 +57,11 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Create Dockerfile if it doesn't exist
+                    // Create secure Dockerfile with non-root user to avoid Sonar warning
                     sh """
-                    if [ ! -f Dockerfile ]; then
-                        cat > Dockerfile << 'EOF'
+                    cat > Dockerfile <<EOF
 FROM node:18-alpine AS builder
+
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -69,29 +69,29 @@ COPY . .
 RUN npm run build
 
 FROM node:18-alpine AS runner
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+
+USER node
 WORKDIR /app
 ENV NODE_ENV=production
-COPY --from=builder /app/package*.json ./
-COPY --from=builder /app/next.config.js ./
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/node_modules ./node_modules
-RUN chown -R appuser:appgroup /app
-USER appuser
+
+COPY --chown=node:node --from=builder /app/package*.json ./
+COPY --chown=node:node --from=builder /app/next.config.js ./
+COPY --chown=node:node --from=builder /app/public ./public
+COPY --chown=node:node --from=builder /app/.next ./.next
+COPY --chown=node:node --from=builder /app/node_modules ./node_modules
+
 EXPOSE 3000
 CMD ["npm", "start"]
 EOF
-                    fi
                     """
 
-                    // Build Docker image with error handling
+                    // Build Docker image with fallback if build fails
                     sh """
                     set +e
                     DOCKER_BUILDKIT=1 docker build -t ${APP_NAME}:${APP_VERSION} .
                     if [ \$? -ne 0 ]; then
-                        echo "Docker build failed, creating minimal image for pipeline to continue"
-                        cat > Dockerfile.minimal << 'EOF'
+                        echo "Docker build failed, using minimal placeholder image"
+                        cat > Dockerfile.minimal <<EOF
 FROM node:18-alpine
 WORKDIR /app
 CMD ["echo", "Placeholder image"]
