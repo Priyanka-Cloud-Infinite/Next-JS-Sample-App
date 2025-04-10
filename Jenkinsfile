@@ -43,7 +43,7 @@ pipeline {
                         -Dsonar.projectKey=${APP_NAME} \
                         -Dsonar.projectName=${APP_NAME} \
                         -Dsonar.sources=. \
-                        -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/**,Jenkinsfile \
+                        -Dsonar.exclusions=node_modules/**,**/*.test.js,**/*.spec.js,**/.next/**,**/out/**,**/.github/**,Jenkinsfile* \
                         -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
                       '''
                   }
