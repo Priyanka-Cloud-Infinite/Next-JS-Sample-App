@@ -54,13 +54,13 @@ pipeline {
               }
           }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    // Create Dockerfile if it doesn't exist
-                    sh '''#!/bin/bash
-                    if [ ! -f Dockerfile ]; then
-                        cat > Dockerfile << 'DOCKERFILE_EOF'
+       stage('Build Docker Image') {
+    steps {
+        script {
+            // Create Dockerfile if it doesn't exist
+            sh '''#!/bin/bash
+            if [ ! -f Dockerfile ]; then
+                cat > Dockerfile << 'DOCKERFILE_EOF'
 FROM node:18-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
@@ -69,6 +69,8 @@ COPY . .
 RUN npm run build
 
 FROM node:18-alpine AS runner
+# Create non-root user
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=builder /app/package*.json ./
@@ -76,30 +78,31 @@ COPY --from=builder /app/next.config.js ./
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/node_modules ./node_modules
-
+RUN chown -R appuser:appgroup /app
+USER appuser
 EXPOSE 3000
 CMD ["npm", "start"]
 DOCKERFILE_EOF
-                    fi
-                    '''
+            fi
+            '''
 
-                    // Build Docker image with error handling and BuildKit enabled
-                    sh '''#!/bin/bash
-                    set +e
-                    DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" .
-                    if [ $? -ne 0 ]; then
-                        echo "Docker build failed, creating minimal image for pipeline to continue"
-                        cat > Dockerfile.minimal << 'EOF'
+            // Build Docker image with error handling and BuildKit enabled
+            sh '''#!/bin/bash
+            set +e
+            DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" .
+            if [ $? -ne 0 ]; then
+                echo "Docker build failed, creating minimal image for pipeline to continue"
+                cat > Dockerfile.minimal << 'EOF'
 FROM node:18-alpine
 WORKDIR /app
 CMD ["echo", "Placeholder image"]
 EOF
-                        DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
-                    fi
-                    '''
-                }
-            }
+                DOCKER_BUILDKIT=1 docker build -t "${APP_NAME}:${APP_VERSION}" -f Dockerfile.minimal .
+            fi
+            '''
         }
+    }
+}
 
         stage('Scan Docker Image') {
             steps {
